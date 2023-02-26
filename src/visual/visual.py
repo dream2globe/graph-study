@@ -4,11 +4,15 @@ import imageio
 from PIL import Image
 from playwright.sync_api import sync_playwright
 
+from src.logger import get_logger
 
-def html2ani(source, target, temp: None | str = None):
-    if temp is None:
-        temp = Path().cwd() / "temp"
-    html_files = source.glob("*.html")
+logger = get_logger()
+
+
+def html2ani(source_path: Path, save_file: Path) -> None:
+    temp = Path().cwd() / "temp"
+    logger.info("Converting HTML to PNG")
+    html_files = source_path.glob("*.html")
     for html in html_files:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=False, args=["--start-maximized"])
@@ -21,13 +25,14 @@ def html2ani(source, target, temp: None | str = None):
             temp_file = temp / f"{html.stem}.png"
             page.screenshot(path=temp_file, full_page=True)
             browser.close()
-    # target
-    png_files = [str(path) for path in target.glob("*.png")]
+    logger.info("Converting PNG to animated GIF")
+    png_files = [str(path) for path in temp.glob("*.png")]
     pngs = [Image.open(png) for png in sorted(png_files)]
-    imageio.mimsave("test.gif", pngs, fps=2)
+    imageio.mimsave(save_file, pngs, "GIF", fps=2)
+    logger.info("finished.")
 
 
 if __name__ == "__main__":
     html_path = Path.cwd() / "data" / "visual" / "html"
-    ani_path = Path.cwd() / "data" / "visual" / "ani"
-    html2ani(html_path, ani_path)
+    save_file = Path.cwd() / "data" / "visual" / "ani" / "ani.gif"
+    html2ani(html_path, save_file)

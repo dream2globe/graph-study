@@ -134,3 +134,4 @@ dmypy.json
 # custom
 data/
 log/
+temp/
