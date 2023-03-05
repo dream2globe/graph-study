@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 import imageio
@@ -22,6 +23,7 @@ def html2ani(source_path: Path, save_file: Path) -> None:
                 timeout=60000,
                 wait_until="networkidle",
             )
+            time.sleep(0.5)
             temp_file = temp / f"{html.stem}.png"
             page.screenshot(path=temp_file, full_page=True)
             browser.close()
