@@ -1,7 +1,7 @@
 
 visual-fs:  # feature selection
 	export PYTHONPATH="/home/shyeon/workspace/ds/graph-study/src":$$PYTHONPATH
-	xvfb-run python3 src/visual/visual.py
+	xvfb-run python3 src/utils/viewer.py
 
 # run-shell:
 # 	docker exec -it mongo-with-fastapi_mongo_1 bash
