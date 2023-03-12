@@ -1,4 +1,5 @@
 import pickle
+from collections import defaultdict
 from pathlib import Path
 
 import lightgbm as lgb
@@ -23,13 +24,13 @@ weight = "value"  # weight key in graph
 pos = pd.read_csv("data/processed/position.csv")  # node positions in graph
 
 # Cache of prediction
-## structure : {"y": {"[x]" : mse, "[x1, x2]" : mse}}
+## structure : {"y_num_xs" : [("features": set[str], "mse": float)]}
 path_cache_mse = Path("data/evaluation/cache_mse.pickle")
 if path_cache_mse.exists():
     with open(path_cache_mse, "rb") as f:
         cache_mse = pickle.load(f)
 else:
-    cache_mse = dict()
+    cache_mse = defaultdict(list)
 
 
 def eval_mse_one(
@@ -39,30 +40,36 @@ def eval_mse_one(
     y: str,
     random_seed: int = 42,
 ) -> float:
+    key_name = str(y) + "_" + str(len(xs))
+    # Search for MSE in cache
+    recodes = cache_mse.get(key_name)
+    if recodes is not None:
+        for features, mse in recodes:
+            if features == set(xs):
+                return mse
+    # If MSE doesn't exist in the cache, the prediction logic will run
     x_train, y_train = trainset[xs].values, trainset[y].values
     x_test, y_test = testset[xs].values, testset[y].values
     model = lgb.LGBMRegressor(random_state=random_seed)
     model.fit(x_train, y_train)
     y_pred = model.predict(x_test)
-    return mean_squared_error(y_test, y_pred)
+    mse = mean_squared_error(y_test, y_pred)
+    cache_mse[key_name].append((set(xs), mse))  # save cache
+    return mse
 
 
 def eval_mse_all(
     trainset: pd.DataFrame, testset: pd.DataFrame, features: list[str], start_num: int, step: int
 ) -> pd.DataFrame:
-    eval_records = []
+    mse_records = []
     for num_xs in range(start_num, len(trainset.columns), step):
         xs = features[:num_xs]
         ys = features[num_xs:]
         logger.info(f"Input variables: {xs}")
-        scores = [eval_mse_one(trainset, testset, xs, y) for y in ys]
-        record = (num_xs, min(scores), np.mean(scores), max(scores))
-        # results
-        eval_records.append(record)
-    eval_mat_df = pd.DataFrame().from_records(
-        eval_records, columns=["num_xs", "min", "mean", "max"]
-    )
-    return eval_mat_df
+        mses = [(num_xs, y, eval_mse_one(trainset, testset, xs, y)) for y in ys]
+        mse_records.extend(mses)
+    mses_df = pd.DataFrame().from_records(mse_records, columns=["num_xs", "y", "mse"])
+    return mses_df
 
 
 if __name__ == "__main__":
@@ -84,7 +91,7 @@ if __name__ == "__main__":
     corr_matrix = scaled_train.corr()
 
     # Hyperparameter
-    alphas = np.arange(0.1, 1.1, 1)
+    alphas = np.arange(0.1, 1.1, 0.1)
 
     logger.info(f"Evaluating prediction performance")
     eval_df_all = pd.DataFrame()
@@ -96,9 +103,14 @@ if __name__ == "__main__":
         selected_nodes = radio_rank(G, alpha, weight)
 
         # Evaluating prediction performance
-        eval_df_one = eval_mse_all(scaled_train, scaled_test, selected_nodes, start_num=1, step=10)
+        eval_df_one = eval_mse_all(scaled_train, scaled_test, selected_nodes, start_num=1, step=2)
         eval_df_one["alpha"] = alpha
         eval_df_all = pd.concat([eval_df_all, eval_df_one])
+        print("all", eval_df_all)
+        print("one", eval_df_one)
 
+    # save results
+    with open("data/evaluation/cache_mse.pickle", "wb") as fw:
+        pickle.dump(cache_mse, fw)
     with open("data/evaluation/mse_test.pickle", "wb") as fw:
         pickle.dump(eval_df_all, fw)
