@@ -21,7 +21,11 @@ random_seed = 42
 # For pagerank
 alpha = 0.1  # damping factor
 weight = "value"  # weight key in graph
-pos = pd.read_csv("data/processed/position.csv")  # node positions in graph
+use_pos = False
+if use_pos == True:
+    pos = pd.read_csv("data/processed/position.csv")  # node positions in graph
+else:
+    pos = None
 
 # Cache of prediction
 ## structure : {"y_num_xs" : [("features": set[str], "mse": float)]}
@@ -106,8 +110,6 @@ if __name__ == "__main__":
         eval_df_one = eval_mse_all(scaled_train, scaled_test, selected_nodes, start_num=1, step=2)
         eval_df_one["alpha"] = alpha
         eval_df_all = pd.concat([eval_df_all, eval_df_one])
-        print("all", eval_df_all)
-        print("one", eval_df_one)
 
     # save results
     with open("data/evaluation/cache_mse.pickle", "wb") as fw:
