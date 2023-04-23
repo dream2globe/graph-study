@@ -58,7 +58,7 @@ def display_graph(nx_graph, path, figsize="1500px"):
 
 
 def html2ani(source_path: Path, save_file: Path) -> None:
-    temp = Path().cwd() / "temp"
+    png_path = Path().cwd() / "data" / "visualization" / "png"
     logger.info("Converting HTML to PNG")
     html_files = source_path.glob("*.html")
     for html in html_files:
@@ -71,11 +71,11 @@ def html2ani(source_path: Path, save_file: Path) -> None:
                 wait_until="networkidle",
             )
             time.sleep(0.5)
-            temp_file = temp / f"{html.stem}.png"
+            temp_file = png_path / f"{html.stem}.png"
             page.screenshot(path=temp_file, full_page=True)
             browser.close()
     logger.info("Converting PNG to animated GIF")
-    png_files = [str(path) for path in temp.glob("*.png")]
+    png_files = [str(path) for path in png_path.glob("*.png")]
     pngs = [Image.open(png) for png in sorted(png_files)]
     imageio.mimsave(save_file, pngs, "GIF", fps=2)
     logger.info("finished.")

@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
-from src.models.graph import radio_rank
+from models.rank import radiorank
 from src.utils.graph import build_nx_graph
 from src.utils.logger import get_logger
 
@@ -93,7 +93,7 @@ if __name__ == "__main__":
         G = build_nx_graph(corr_matrix, titles, pos=pos, threshold=0)
 
         # Features which are ordered by importance
-        selected_nodes = radio_rank(G, alpha, weight)
+        selected_nodes = radiorank(G, alpha, weight)
 
         # Evaluating prediction performance
         eval_df_one = eval_mse_all(scaled_train, scaled_test, selected_nodes, start_num=1, step=10)
