@@ -68,8 +68,7 @@ def eval_mse_all(
 if __name__ == "__main__":
     # Load preprocessed data
     logger.info(f"Load preprocessed data")
-    with open("data/processed/values.pickle", "rb") as f:
-        value_df = pickle.load(f)
+    value_df = pd.read_pickle("data/processed/values.pickle")
     test_items = value_df.columns.tolist()
     item_2_idx = {v: k for k, v in enumerate(test_items)}
     idx_2_item = {k: v for k, v in enumerate(test_items)}

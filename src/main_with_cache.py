@@ -2,6 +2,7 @@ import pickle
 from collections import defaultdict
 from itertools import combinations
 from pathlib import Path
+from typing import Union
 
 import lightgbm as lgb
 import numpy as np
@@ -33,8 +34,7 @@ else:
 ## structure : {"y_num_xs" : [("features": set[str], "mse": float)]}
 path_cache_mse = Path("data/evaluation/cache_mse.pickle")
 if path_cache_mse.exists():
-    with open(path_cache_mse, "rb") as f:
-        cache_mse = pickle.load(f)
+    cache_mse = pd.read_pickle(path_cache_mse)
 else:
     cache_mse = defaultdict(list)
 
@@ -83,7 +83,7 @@ def eval_mse_all(
     return mses_df
 
 
-def infer_relation(data: np.array, method: str = "corr") -> np.array | None:
+def infer_relation(data: np.array, method: str = "corr") -> Union[np.ndarray, None]:
     match (method):
         case "corr":
             return np.corrcoef(data, rowvar=False)
@@ -102,8 +102,7 @@ def infer_relation(data: np.array, method: str = "corr") -> np.array | None:
 if __name__ == "__main__":
     # Load preprocessed data
     logger.info(f"Load preprocessed data")
-    with open("data/processed/values.pickle", "rb") as f:
-        value_df = pickle.load(f)
+    value_df = pd.read_pickle("data/processed/values.pickle")
     test_items = value_df.columns.tolist()
     item_2_idx = {v: k for k, v in enumerate(test_items)}
     idx_2_item = {k: v for k, v in enumerate(test_items)}
