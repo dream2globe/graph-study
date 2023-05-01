@@ -14,7 +14,7 @@ def pagerank(
     nstart=None,
     weight="weight",
     dangling=None,
-):
+) -> list:
     """Return the PageRank of the nodes in the graph.
     PageRank computes a ranking of the nodes in the graph G based on
     the structure of the incoming links. It was originally designed as
@@ -48,8 +48,8 @@ def pagerank(
         dangling dict to be the same as the personalization dict.
     Returns
     -------
-    pagerank : dictionary
-        Dictionary of nodes with PageRank as value
+    pagerank : list
+        List of nodes sorted by PageRank score
     Notes
     -----
     The eigenvector calculation is done by the power iteration method
@@ -118,7 +118,7 @@ def pagerank(
         # check convergence, l1 norm
         err = sum([abs(x[n] - xlast[n]) for n in x])
         if err < N * tol:
-            return x
+            return pd.Series(x).sort_values(ascending=False).index.tolist()
     raise NetworkXError(
         "pagerank: power iteration failed to converge " "in %d iterations." % max_iter
     )
@@ -159,8 +159,9 @@ def radiorank(G: nx.graph, alpha: float, weight: str, visualization=False, color
         else:
             personal_weights = dict.fromkeys(G, 1)
         # Scoring with personalization
-        pr_score = pagerank(G, alpha=alpha, weight=weight, personalization=personal_weights)
-        sorted_nodes_by_pr = pd.Series(pr_score).sort_values(ascending=False).index.tolist()
+        sorted_nodes_by_pr = pagerank(
+            G, alpha=alpha, weight=weight, personalization=personal_weights
+        )
         # Append the most important feature
         for node in sorted_nodes_by_pr:
             if node not in selected_nodes:

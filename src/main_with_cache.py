@@ -1,13 +1,13 @@
-import pickle
+import warnings
 from collections import defaultdict
-from itertools import combinations
+from itertools import product
 from pathlib import Path
-from typing import Union
 
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
 from sklearn.covariance import GraphicalLassoCV
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -20,6 +20,7 @@ from src.utils.logger import get_logger
 # General
 logger = get_logger()
 random_seed = 42
+warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
 # For pagerank
 alpha = 0.1  # damping factor
@@ -83,22 +84,6 @@ def eval_mse_all(
     return mses_df
 
 
-def infer_relation(data: np.array, method: str = "corr") -> Union[np.ndarray, None]:
-    match (method):
-        case "corr":
-            return np.corrcoef(data, rowvar=False)
-        case "lasso":
-            cov = GraphicalLassoCV().fit(data)
-            return cov.precision_
-        case _:
-            logger.error(
-                "'method' argument should be one of 'corr(Correlation)', 'lasso(Graphical Lasso)' & 'kl(KL-Divergence)"
-            )
-            return None
-        # case "kl":
-        #     pass
-
-
 if __name__ == "__main__":
     # Load preprocessed data
     logger.info(f"Load preprocessed data")
@@ -115,53 +100,64 @@ if __name__ == "__main__":
     scaled_test = pd.DataFrame(scaler.transform(test))
     titles = train.columns.tolist()
 
-    corr_matrix = scaled_train.corr()
+    # Prepare matrix to build a graph
+    logger.info(f"build graph using one of 'correlation', 'graph lasso' and 'KL-Divergence'")
+    corr_mat = scaled_train.corr()
+    cov = GraphicalLassoCV().fit(scaled_train)
+    lasso_mat = cov.precision_.copy()
 
-    # RadioRank
+    # combination
+    mats = [corr_mat, lasso_mat]
+    rankers = [pagerank, radiorank]
+    pred_models = [lgb.LGBMRegressor]
     alphas = np.arange(0.1, 1.1, 0.1)
-    logger.info(f"Evaluating prediction performance")
-    eval_df_all = pd.DataFrame()
-    logger.info(f"Evaluating prediction performance")
-    for alpha in tqdm(alphas):
-        # Build a graph using a correlation matrix
-        G = build_nx_graph(corr_matrix, titles, pos=pos, threshold=0)
-        # Features which are ordered by importance
-        selected_nodes = radiorank(G, alpha, weight)
-        # Evaluating prediction performance
-        eval_df_one = eval_mse_all(
-            scaled_train,
-            scaled_test,
-            selected_nodes,
-            start_num=1,
-            step=2,
-            model=lgb.LGBMRegressor(random_state=random_seed),
-        )
-        eval_df_one["ranker"] = "RadioRank"
-        eval_df_one["alpha"] = alpha
-        eval_df_all = pd.concat([eval_df_all, eval_df_one])
+    hyper_params = list(product(mats, rankers, pred_models, alphas))
 
-    # PageRank
-    for alpha in tqdm(alphas):
-        # Build a graph using a correlation matrix
-        G = build_nx_graph(corr_matrix, titles, pos=pos, threshold=0)
-        # Features which are ordered by importance
-        pr_score = pagerank(G, alpha)
-        selected_nodes = pd.Series(pr_score).sort_values(ascending=False).index.tolist()
-        # Evaluating prediction performance
-        eval_df_one = eval_mse_all(
-            scaled_train,
-            scaled_test,
-            selected_nodes,
-            start_num=1,
-            step=2,
-            model=lgb.LGBMRegressor(random_state=random_seed),
-        )
-        eval_df_one["ranker"] = "PageRank"
-        eval_df_one["alpha"] = alpha
-        eval_df_all = pd.concat([eval_df_all, eval_df_one])
+    for mat, ranker, model, alpha in hyper_params:
+        print(mat, ranker, model, alpha)
 
-    # Save results before the end of S/W running
-    with open("data/evaluation/cache_mse.pickle", "wb") as fw:
-        pickle.dump(cache_mse, fw)
-    with open("data/evaluation/mse.pickle", "wb") as fw:
-        pickle.dump(eval_df_all, fw)
+    # # RadioRank
+    # logger.info(f"Evaluating prediction performance")
+    # eval_df_all = pd.DataFrame()
+    # for alpha in tqdm(alphas):
+    #     # Build a graph using a correlation matrix
+    #     G = build_nx_graph(corr_mat, titles, pos=pos, threshold=0)
+    #     # Features which are ordered by importance
+    #     selected_nodes = radiorank(G, alpha, weight)
+    #     # Evaluating prediction performance
+    #     eval_df_one = eval_mse_all(
+    #         scaled_train,
+    #         scaled_test,
+    #         selected_nodes,
+    #         start_num=1,
+    #         step=2,
+    #         model=lgb.LGBMRegressor(random_state=random_seed),
+    #     )
+    #     eval_df_one["ranker"] = "RadioRank"
+    #     eval_df_one["alpha"] = alpha
+    #     eval_df_all = pd.concat([eval_df_all, eval_df_one])
+
+    # # PageRank
+    # for alpha in tqdm(alphas):
+    #     # Build a graph using a correlation matrix
+    #     G = build_nx_graph(corr_mat, titles, pos=pos, threshold=0)
+    #     # Features which are ordered by importance
+    #     selected_nodes = pagerank(G, alpha)
+    #     # Evaluating prediction performance
+    #     eval_df_one = eval_mse_all(
+    #         scaled_train,
+    #         scaled_test,
+    #         selected_nodes,
+    #         start_num=1,
+    #         step=2,
+    #         model=lgb.LGBMRegressor(random_state=random_seed),
+    #     )
+    #     eval_df_one["ranker"] = "PageRank"
+    #     eval_df_one["alpha"] = alpha
+    #     eval_df_all = pd.concat([eval_df_all, eval_df_one])
+
+    # # Save results before the end of S/W running
+    # with open("data/evaluation/cache_mse.pickle", "wb") as fw:
+    #     pickle.dump(cache_mse, fw)
+    # with open("data/evaluation/mse.pickle", "wb") as fw:
+    #     pickle.dump(eval_df_all, fw)
