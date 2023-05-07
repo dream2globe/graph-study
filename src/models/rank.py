@@ -12,7 +12,7 @@ def pagerank(
     max_iter=100,
     tol=1.0e-6,
     nstart=None,
-    weight="weight",
+    weight="value",
     dangling=None,
 ) -> list:
     """Return the PageRank of the nodes in the graph.
@@ -124,7 +124,7 @@ def pagerank(
     )
 
 
-def radiorank(G: nx.graph, alpha: float, weight: str, visualization=False, color="#dd4b39"):
+def radiorank(G: nx.graph, alpha: float, weight="value", visualization=False, color="#dd4b39"):
     """Pagerank-inspired algorithm is being used to rank the importance of individual test items
         in the radio frequency testing process used in mobile manufacturing.
     Args:

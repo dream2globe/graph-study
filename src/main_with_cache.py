@@ -1,3 +1,4 @@
+import pickle
 import warnings
 from collections import defaultdict
 from itertools import product
@@ -7,6 +8,7 @@ import lightgbm as lgb
 import numpy as np
 import pandas as pd
 from sklearn.covariance import GraphicalLassoCV
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
@@ -19,12 +21,12 @@ from src.utils.logger import get_logger
 
 # General
 logger = get_logger()
+weight = "value"
 random_seed = 42
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
 # For pagerank
 alpha = 0.1  # damping factor
-weight = "value"  # weight key in graph
 use_pos = False
 if use_pos == True:
     pos = pd.read_csv("data/processed/position.csv")  # node positions in graph
@@ -74,11 +76,16 @@ def eval_mse_all(
     model: any,
 ) -> pd.DataFrame:
     mse_records = []
-    for num_xs in range(start_num, len(trainset.columns), step):
+    progress_bar = tqdm(range(start_num, len(trainset.columns), step), leave=False)
+    for num_xs in progress_bar:
+        progress_bar.set_description(f"The num of features: {num_xs}")
         xs = features[:num_xs]
         ys = features[num_xs:]
-        logger.info(f"Input variables: {xs}")
-        mses = [(num_xs, y, eval_mse_one(trainset, testset, xs, y, model)) for y in ys]
+        # logger.info(f"Input variables: {xs}")
+        mses = [
+            (num_xs, y, eval_mse_one(trainset, testset, xs, y, model))
+            for y in tqdm(ys, leave=False)
+        ]
         mse_records.extend(mses)
     mses_df = pd.DataFrame().from_records(mse_records, columns=["num_xs", "y", "mse"])
     return mses_df
@@ -104,60 +111,63 @@ if __name__ == "__main__":
     logger.info(f"build graph using one of 'correlation', 'graph lasso' and 'KL-Divergence'")
     corr_mat = scaled_train.corr()
     cov = GraphicalLassoCV().fit(scaled_train)
-    lasso_mat = cov.precision_.copy()
+    lasso_mat = pd.DataFrame(cov.precision_)
 
-    # combination
-    mats = [corr_mat, lasso_mat]
-    rankers = [pagerank, radiorank]
-    pred_models = [lgb.LGBMRegressor]
-    alphas = np.arange(0.1, 1.1, 0.1)
-    hyper_params = list(product(mats, rankers, pred_models, alphas))
+    # Set parameters
+    hyper_params = {
+        "relation": [
+            {"name": "corr_mat", "value": corr_mat},
+            {"name": "lasso_mat", "value": lasso_mat},
+        ],
+        "rankers": [
+            {"name": "pagerank", "value": pagerank},
+            {"name": "radiorank", "value": radiorank},
+        ],
+        "alphas": np.arange(0.1, 1.1, 0.1),
+        "models": [
+            # {
+            #     "name": "rf",
+            #     "value": RandomForestRegressor(random_state=random_seed, n_jobs=-1),
+            # },
+            {
+                "name": "lgb",
+                "value": lgb.LGBMRegressor(random_state=random_seed, n_jobs=-1),
+            },
+        ],
+    }
+    combination = product(*[value for value in hyper_params.values()])
 
-    for mat, ranker, model, alpha in hyper_params:
-        print(mat, ranker, model, alpha)
+    # Run main loop
+    eval_df_all = pd.DataFrame()
+    progress_bar = tqdm(list(combination))
+    for relation, ranker, alpha, model in progress_bar:
+        progress_bar.set_description(
+            f"{relation['name']}, {ranker['name']}, {alpha}, {model['name']}"
+        )
 
-    # # RadioRank
-    # logger.info(f"Evaluating prediction performance")
-    # eval_df_all = pd.DataFrame()
-    # for alpha in tqdm(alphas):
-    #     # Build a graph using a correlation matrix
-    #     G = build_nx_graph(corr_mat, titles, pos=pos, threshold=0)
-    #     # Features which are ordered by importance
-    #     selected_nodes = radiorank(G, alpha, weight)
-    #     # Evaluating prediction performance
-    #     eval_df_one = eval_mse_all(
-    #         scaled_train,
-    #         scaled_test,
-    #         selected_nodes,
-    #         start_num=1,
-    #         step=2,
-    #         model=lgb.LGBMRegressor(random_state=random_seed),
-    #     )
-    #     eval_df_one["ranker"] = "RadioRank"
-    #     eval_df_one["alpha"] = alpha
-    #     eval_df_all = pd.concat([eval_df_all, eval_df_one])
+        # Build a graph using a correlation matrix
+        G = build_nx_graph(relation["value"], titles, pos=pos, threshold=0)
 
-    # # PageRank
-    # for alpha in tqdm(alphas):
-    #     # Build a graph using a correlation matrix
-    #     G = build_nx_graph(corr_mat, titles, pos=pos, threshold=0)
-    #     # Features which are ordered by importance
-    #     selected_nodes = pagerank(G, alpha)
-    #     # Evaluating prediction performance
-    #     eval_df_one = eval_mse_all(
-    #         scaled_train,
-    #         scaled_test,
-    #         selected_nodes,
-    #         start_num=1,
-    #         step=2,
-    #         model=lgb.LGBMRegressor(random_state=random_seed),
-    #     )
-    #     eval_df_one["ranker"] = "PageRank"
-    #     eval_df_one["alpha"] = alpha
-    #     eval_df_all = pd.concat([eval_df_all, eval_df_one])
+        # Features which are ordered by importance
+        selected_nodes = ranker["value"](G, alpha)
 
-    # # Save results before the end of S/W running
-    # with open("data/evaluation/cache_mse.pickle", "wb") as fw:
-    #     pickle.dump(cache_mse, fw)
-    # with open("data/evaluation/mse.pickle", "wb") as fw:
-    #     pickle.dump(eval_df_all, fw)
+        # Evaluating prediction performance
+        eval_df_one = eval_mse_all(
+            scaled_train,
+            scaled_test,
+            selected_nodes,
+            start_num=1,
+            step=2,
+            model=model["value"],
+        )
+        eval_df_one["relation"] = relation["name"]
+        eval_df_one["ranker"] = ranker["name"]
+        eval_df_one["alpha"] = alpha
+        eval_df_one["model"] = model["name"]
+        eval_df_all = pd.concat([eval_df_all, eval_df_one])
+
+        # Save prediction performance (overwrite on every iteration)
+        with open("data/evaluation/cache_mse.pickle", "wb") as fw:
+            pickle.dump(cache_mse, fw)
+        with open("data/evaluation/mse.pickle", "wb") as fw:
+            pickle.dump(eval_df_all, fw)
