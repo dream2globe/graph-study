@@ -125,13 +125,13 @@ if __name__ == "__main__":
         ],
         "alphas": np.arange(0.1, 1.1, 0.1),
         "models": [
-            # {
-            #     "name": "rf",
-            #     "value": RandomForestRegressor(random_state=random_seed, n_jobs=-1),
-            # },
             {
                 "name": "lgb",
                 "value": lgb.LGBMRegressor(random_state=random_seed, n_jobs=-1),
+            },
+            {
+                "name": "rf",
+                "value": RandomForestRegressor(random_state=random_seed, n_jobs=-1),
             },
         ],
     }
