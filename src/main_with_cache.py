@@ -76,9 +76,9 @@ def eval_mse_all(
     model: any,
 ) -> pd.DataFrame:
     mse_records = []
-    progress_bar = tqdm(range(start_num, len(trainset.columns), step), leave=False)
-    for num_xs in progress_bar:
-        progress_bar.set_description(f"The num of features: {num_xs}")
+    p_bar = tqdm(range(start_num, len(trainset.columns), step), leave=False)
+    for num_xs in p_bar:
+        p_bar.set_description(f"The num of features: {num_xs}")
         xs = features[:num_xs]
         ys = features[num_xs:]
         # logger.info(f"Input variables: {xs}")
@@ -126,12 +126,12 @@ if __name__ == "__main__":
         "alphas": np.arange(0.1, 1.1, 0.1),
         "models": [
             {
-                "name": "lgb",
-                "value": lgb.LGBMRegressor(random_state=random_seed, n_jobs=-1),
-            },
-            {
                 "name": "rf",
                 "value": RandomForestRegressor(random_state=random_seed, n_jobs=-1),
+            },
+            {
+                "name": "lgb",
+                "value": lgb.LGBMRegressor(random_state=random_seed, n_jobs=-1),
             },
         ],
     }
@@ -139,17 +139,15 @@ if __name__ == "__main__":
 
     # Run main loop
     eval_df_all = pd.DataFrame()
-    progress_bar = tqdm(list(combination))
-    for relation, ranker, alpha, model in progress_bar:
-        progress_bar.set_description(
-            f"{relation['name']}, {ranker['name']}, {alpha}, {model['name']}"
-        )
+    p_bar = tqdm(list(combination))
+    for relation, ranker, alpha, model in p_bar:
+        p_bar.set_description(f"{relation['name']}, {ranker['name']}, {alpha}, {model['name']}")
 
         # Build a graph using a correlation matrix
         G = build_nx_graph(relation["value"], titles, pos=pos, threshold=0)
 
         # Features which are ordered by importance
-        selected_nodes = ranker["value"](G, alpha)
+        selected_nodes = ranker["value"](G, alpha, max_iter=500)
 
         # Evaluating prediction performance
         eval_df_one = eval_mse_all(

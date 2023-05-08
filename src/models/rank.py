@@ -3,6 +3,9 @@ import pandas as pd
 from networkx.exception import NetworkXError
 
 from src.utils.graph import display_graph
+from utils.logger import get_logger
+
+logger = get_logger()
 
 
 def pagerank(
@@ -105,7 +108,7 @@ def pagerank(
         dangling_weights = dict((k, v / s) for k, v in dangling.items())
     dangling_nodes = [n for n in W if W.out_degree(n, weight=weight) == 0.0]
     # power iteration: make up to max_iter iterations
-    for _ in range(max_iter):
+    for i in range(max_iter):
         xlast = x
         x = dict.fromkeys(xlast.keys(), 0)
         danglesum = alpha * sum(xlast[n] for n in dangling_nodes)
@@ -119,12 +122,13 @@ def pagerank(
         err = sum([abs(x[n] - xlast[n]) for n in x])
         if err < N * tol:
             return pd.Series(x).sort_values(ascending=False).index.tolist()
-    raise NetworkXError(
-        "pagerank: power iteration failed to converge " "in %d iterations." % max_iter
-    )
+    logger.warning("pagerank: power iteration failed to converge " "in %d iterations." % max_iter)
+    return pd.Series(x).sort_values(ascending=False).index.tolist()
 
 
-def radiorank(G: nx.graph, alpha: float, weight="value", visualization=False, color="#dd4b39"):
+def radiorank(
+    G: nx.graph, alpha: float, weight="value", max_iter=100, visualization=False, color="#dd4b39"
+):
     """Pagerank-inspired algorithm is being used to rank the importance of individual test items
         in the radio frequency testing process used in mobile manufacturing.
     Args:
@@ -160,7 +164,7 @@ def radiorank(G: nx.graph, alpha: float, weight="value", visualization=False, co
             personal_weights = dict.fromkeys(G, 1)
         # Scoring with personalization
         sorted_nodes_by_pr = pagerank(
-            G, alpha=alpha, weight=weight, personalization=personal_weights
+            G, alpha=alpha, weight=weight, personalization=personal_weights, max_iter=max_iter
         )
         # Append the most important feature
         for node in sorted_nodes_by_pr:
