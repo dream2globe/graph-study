@@ -37,7 +37,8 @@ else:
 ## structure : {"y_num_xs" : [("features": set[str], "mse": float)]}
 path_cache_mse = Path("data/evaluation/cache_mse.pickle")
 if path_cache_mse.exists():
-    cache_mse = pd.read_pickle(path_cache_mse)
+    with open(path_cache_mse, "rb") as f:
+        cache_mse = pickle.load(f)
 else:
     cache_mse = defaultdict(list)
 
@@ -63,7 +64,7 @@ def eval_mse_one(
     model.fit(x_train, y_train)
     y_pred = model.predict(x_test)
     mse = mean_squared_error(y_test, y_pred)
-    cache_mse[key_name].append((set(xs), mse))  # save cache
+    cache_mse[key_name].append((set(xs), mse))  # save to cache
     return mse
 
 
@@ -123,31 +124,35 @@ if __name__ == "__main__":
             {"name": "pagerank", "value": pagerank},
             {"name": "radiorank", "value": radiorank},
         ],
-        "alphas": np.arange(0.1, 1.1, 0.1),
+        "alphas": np.arange(0.1, 1.0, 0.05),
         "models": [
-            {
-                "name": "rf",
-                "value": RandomForestRegressor(random_state=random_seed, n_jobs=-1),
-            },
+            # {
+            #     "name": "rf",
+            #     "value": RandomForestRegressor(random_state=random_seed, n_jobs=-1),
+            # },
             {
                 "name": "lgb",
                 "value": lgb.LGBMRegressor(random_state=random_seed, n_jobs=-1),
             },
         ],
     }
-    combination = product(*[value for value in hyper_params.values()])
+    combination = product(
+        *[value for value in hyper_params.values()]
+    )  # print([item for item in list(combination)])
 
     # Run main loop
     eval_df_all = pd.DataFrame()
     p_bar = tqdm(list(combination))
     for relation, ranker, alpha, model in p_bar:
-        p_bar.set_description(f"{relation['name']}, {ranker['name']}, {alpha}, {model['name']}")
+        p_bar.set_description(
+            f"{relation['name']}, {ranker['name']}, {round(alpha, 2)}, {model['name']}"
+        )
 
         # Build a graph using a correlation matrix
         G = build_nx_graph(relation["value"], titles, pos=pos, threshold=0)
 
         # Features which are ordered by importance
-        selected_nodes = ranker["value"](G, alpha, max_iter=500)
+        selected_nodes = ranker["value"](G, round(alpha, 2), max_iter=500)
 
         # Evaluating prediction performance
         eval_df_one = eval_mse_all(
@@ -160,12 +165,12 @@ if __name__ == "__main__":
         )
         eval_df_one["relation"] = relation["name"]
         eval_df_one["ranker"] = ranker["name"]
-        eval_df_one["alpha"] = alpha
+        eval_df_one["alpha"] = round(alpha, 2)
         eval_df_one["model"] = model["name"]
         eval_df_all = pd.concat([eval_df_all, eval_df_one])
 
         # Save prediction performance (overwrite on every iteration)
+        eval_df_all.to_pickle("data/evaluation/mse.pickle")
+        # Save caches
         with open("data/evaluation/cache_mse.pickle", "wb") as fw:
             pickle.dump(cache_mse, fw)
-        with open("data/evaluation/mse.pickle", "wb") as fw:
-            pickle.dump(eval_df_all, fw)
