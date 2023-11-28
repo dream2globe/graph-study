@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Current File",
+            "name": "Python Runner",
             "type": "python",
             "request": "launch",
             "program": "${file}",
@@ -14,7 +14,8 @@
             "cwd": "${workspaceFolder}",
             "env": {
                 "PYTHONPATH": "${cwd}"
-            }
+            },
+            "envFile": "${workspaceFolder}/.env"
         }
     ]
 }

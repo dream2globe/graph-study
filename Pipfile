@@ -4,6 +4,17 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+lightgbm = "*"
+numpy = "*"
+pandas = "*"
+scikit-learn = "*"
+tqdm = "*"
+networkx = "*"
+imageio = "*"
+pyvis = "*"
+playwright = "*"
+loguru = "*"
+cd = "*"
 
 [dev-packages]
 
