@@ -8,6 +8,7 @@ import pandas as pd
 from PIL import Image
 from playwright.sync_api import sync_playwright
 from pyvis.network import Network
+from tqdm import tqdm
 
 from src.utils.logger import get_logger
 
@@ -57,11 +58,13 @@ def display_graph(nx_graph, path, figsize="1500px"):
     net.write_html(path)
 
 
-def html2ani(source_path: Path, save_file: Path) -> None:
+def html2ani(source_path: Path, save_file: None | Path = None, animation=False) -> None:
     png_path = Path().cwd() / "data" / "visualization" / "png"
     logger.info("Converting HTML to PNG")
     html_files = source_path.glob("*.html")
-    for html in html_files:
+    p_bar = tqdm(list(html_files))
+    for html in p_bar:
+        p_bar.set_description(f"{html}")
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=False, args=["--start-maximized"])
             page = browser.new_page()
@@ -74,8 +77,9 @@ def html2ani(source_path: Path, save_file: Path) -> None:
             temp_file = png_path / f"{html.stem}.png"
             page.screenshot(path=temp_file, full_page=True)
             browser.close()
-    logger.info("Converting PNG to animated GIF")
-    png_files = [str(path) for path in png_path.glob("*.png")]
-    pngs = [Image.open(png) for png in sorted(png_files)]
-    imageio.mimsave(save_file, pngs, "GIF", fps=2)
+    if animation:
+        logger.info("Converting PNG to animated GIF")
+        png_files = [str(path) for path in png_path.glob("*.png")]
+        pngs = [Image.open(png) for png in sorted(png_files)]
+        imageio.mimsave(save_file, pngs, "GIF", fps=2)
     logger.info("finished.")

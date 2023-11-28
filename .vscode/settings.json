@@ -1,25 +1,21 @@
 {
-    "python.linting.enabled": true,
     "python.testing.pytestArgs": [
         "tests"
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
     "editor.formatOnSave": true,
-    "python.formatting.provider": "none",
-    "python.formatting.blackArgs": [
-        "--line-length",
-        "100"
-    ],
     "[python]": {
         "editor.codeActionsOnSave": {
             "source.organizeImports": true
         },
-        "editor.defaultFormatter": "ms-python.black-formatter"
+        "editor.defaultFormatter": "ms-python.black-formatter",
     },
     "python.analysis.extraPaths": [
         "lib",
         "src",
         "util"
-    ]
+    ],
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.autoImportCompletions": true
 }

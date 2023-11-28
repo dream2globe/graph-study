@@ -48,7 +48,11 @@ def eval_mse_one(
 
 
 def eval_mse_all(
-    trainset: pd.DataFrame, testset: pd.DataFrame, features: list[str], start_num: int, step: int
+    trainset: pd.DataFrame,
+    testset: pd.DataFrame,
+    features: list[str],
+    start_num: int,
+    step: int,
 ) -> pd.DataFrame:
     eval_records = []
     for num_xs in range(start_num, len(trainset.columns), step):
@@ -75,7 +79,9 @@ if __name__ == "__main__":
 
     # Prepare training and test data
     logger.info(f"Prepare training and test data")
-    train, test = train_test_split(value_df, test_size=0.5, random_state=random_seed, shuffle=False)
+    train, test = train_test_split(
+        value_df, test_size=0.5, random_state=random_seed, shuffle=False
+    )
     scaler = StandardScaler().fit(train)
     scaled_train = pd.DataFrame(scaler.transform(train))
     scaled_test = pd.DataFrame(scaler.transform(test))
@@ -95,7 +101,9 @@ if __name__ == "__main__":
         selected_nodes = radiorank(G, alpha, weight)
 
         # Evaluating prediction performance
-        eval_df_one = eval_mse_all(scaled_train, scaled_test, selected_nodes, start_num=1, step=10)
+        eval_df_one = eval_mse_all(
+            scaled_train, scaled_test, selected_nodes, start_num=1, step=10
+        )
         eval_df_one["alpha"] = alpha
         eval_df_all = pd.concat([eval_df_all, eval_df_one])
 
